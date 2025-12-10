@@ -1,175 +1,131 @@
-```javascript
 import * as Lark from '@larksuiteoapi/node-sdk';
 
 /**
- * 配置应用基础信息和请求域名。
- * App base information and request domain name.
+ * Config from env
  */
 const baseConfig = {
-  // 应用的 AppID, 你可以在开发者后台获取。 AppID of the application, you can get it in the developer console.
   appId: process.env.APP_ID,
-  // 应用的 AppSecret，你可以在开发者后台获取。 AppSecret of the application, you can get it in the developer console.
   appSecret: process.env.APP_SECRET,
-  // 请求域名，如：https://open.feishu.cn。 Request domain name, such as https://open.feishu.cn.
   domain: process.env.BASE_DOMAIN || 'https://open.feishu.cn',
 };
 
-/**
- * 创建 LarkClient 对象，用于请求OpenAPI, 并创建 LarkWSClient 对象，用于使用长连接接收事件。
- * Create LarkClient object for requesting OpenAPI, and create LarkWSClient object for receiving events using long connection.
- */
 const client = new Lark.Client(baseConfig);
 const wsClient = new Lark.WSClient(baseConfig);
 
 /**
- * 根据消息内容创建任务
  * Create a task based on message content
- * 
- * 消息格式: "创建任务: 任务标题"
- * Message format: "创建任务: 任务标题"
- * 
- * @param {string} content 消息内容 / Message content
- * @param {string} chatId 会话ID / Chat ID
- * @param {string} messageId 消息ID / Message ID
- * @returns {Promise<Object>} 任务创建结果 / Task creation result
  */
 async function createTaskFromMessage(content, chatId, messageId) {
   try {
-    // 从消息中提取任务标题
-    // Extract task title from message
-    const taskTitle = content.trim();
-
+    const taskTitle = (content || '').trim();
     if (!taskTitle) {
-      return {
-        success: false,
-        message: '任务标题不能为空 / Task title cannot be empty',
-      };
+      return { success: false, message: '任务标题不能为空 / Task title cannot be empty' };
     }
 
-    /**
-     * 调用飞书任务API创建任务
-     * Call Lark Task API to create task
-     * API文档: https://open.feishu.cn/document/server-docs/task-v2/task/create
-     */
+    console.log(`📝 Creating task: "${taskTitle}"`);
+
+    // due time: 24 hours later (seconds)
+    const dueTimeSeconds = Math.floor((Date.now() + 24 * 60 * 60 * 1000) / 1000);
+
+    // Use `due.timestamp` as required by the API (seconds)
     const response = await client.task.v2.task.create({
       data: {
         summary: taskTitle,
-        description: `来自消息的任务 / Task from message\n消息ID / Message ID: ${messageId}`,
+        description: `Task from message\nMessage ID: ${messageId}`,
         due: {
-          time: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 设置为明天 / Set to tomorrow
+          timestamp: dueTimeSeconds,
         },
       },
     });
 
-    return {
-      success: true,
-      message: `✅ 任务创建成功 / Task created successfully\n任务: ${taskTitle}`,
-      taskId: response.data?.task?.id,
-    };
+    console.log('✅ Task created, response:', response?.data || response);
+    return { success: true, message: '任务创建成功', taskId: response.data?.task?.id };
   } catch (error) {
-    console.error('创建任务失败 / Failed to create task:', error);
-    return {
-      success: false,
-      message: `❌ 创建任务失败 / Failed to create task: ${error.message}`,
-    };
+    // Print detailed error info for debugging
+    console.error('Failed to create task:', error.message || error);
+    if (error.response && error.response.data) {
+      console.error('API error response:', JSON.stringify(error.response.data, null, 2));
+    }
+    return { success: false, message: error.response?.data || error.message || String(error) };
   }
 }
 
 /**
- * 注册事件处理器。
- * Register event handler.
+ * Event handling
  */
 const eventDispatcher = new Lark.EventDispatcher({}).register({
-  /**
-   * 注册接收消息事件，处理接收到的消息。
-   * Register event handler to handle received messages.
-   * https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/events/receive
-   */
   'im.message.receive_v1': async (data) => {
-    const {
-      message: { chat_id, content, message_type, chat_type, message_id },
-    } = data;
-
-    console.log('收到消息 / Received message:', { chat_type, message_type });
-
-    let responseText = '';
-    let taskResult = null;
-
     try {
-      if (message_type !== 'text') {
-        responseText = '只支持文本消息 / Only text messages are supported';
-      } else {
-        const messageContent = JSON.parse(content);
-        const text = messageContent.text;
+      const message = data?.message || {};
+      const messageId = message.message_id;
+      const chatId = message.chat_id;
+      const contentRaw = message.content || '';
 
-        // 检查消息是否以"创建任务:"开头
-        // Check if message starts with "创建任务:" or "create task:"
-        if (text.toLowerCase().includes('创建任务:') || text.toLowerCase().includes('create task:')) {
-          let taskTitle = text;
+      console.log('\n📬 Received message', { messageId, chatId, contentRaw });
 
-          // 提取任务标题
-          // Extract task title
-          if (text.includes('创建任务:')) {
-            taskTitle = text.split('创建任务:')[1].trim();
-          } else if (text.includes('create task:')) {
-            taskTitle = text.split('create task:')[1].trim();
-          }
+      // message.content is usually a JSON string like {"text":"..."}
+      let text = '';
+      try {
+        const parsed = JSON.parse(contentRaw);
+        text = parsed.text || '';
+      } catch (e) {
+        // fallback: use raw content
+        text = contentRaw;
+      }
 
-          // 创建任务
-          // Create task
-          taskResult = await createTaskFromMessage(taskTitle, chat_id, message_id);
-          responseText = taskResult.message;
+      let taskTitle = null;
+      if (text.includes('创建任务:')) {
+        taskTitle = text.split('创建任务:')[1]?.trim();
+      } else if (/create task:/i.test(text)) {
+        taskTitle = text.split(/create task:/i)[1]?.trim();
+      }
+
+      if (!taskTitle) {
+        console.log('No task creation instruction detected.');
+        return;
+      }
+
+      console.log('Task request detected:', taskTitle);
+      const result = await createTaskFromMessage(taskTitle, chatId, messageId);
+
+      const replyText = result.success
+        ? `✅ 成功为您创建了任务："${taskTitle}"`
+        : `❌ 创建任务失败：${typeof result.message === 'string' ? result.message : JSON.stringify(result.message)}`;
+
+      // Reply to the original message if message_id is available; otherwise send a new message to the chat.
+      try {
+        if (messageId) {
+          await client.im.v1.message.reply({
+            message_id: messageId,
+            content: JSON.stringify({ text: replyText }),
+            msg_type: 'text',
+          });
+        } else if (chatId) {
+          await client.im.v1.message.create({
+            data: {
+              receive_id: chatId,
+              receive_id_type: 'chat_id',
+              content: JSON.stringify({ text: replyText }),
+              msg_type: 'text',
+            },
+          });
         } else {
-          responseText = `收到消息: ${text}\n\n💡 提示: 发送 "创建任务: [任务标题]" 来创建任务\nTip: Send "create task: [task title]" to create a task`;
+          console.warn('No message_id or chat_id available to reply to.');
         }
+        console.log('Reply sent');
+      } catch (sendErr) {
+        console.error('Failed to send reply:', sendErr);
       }
-    } catch (error) {
-      console.error('处理消息失败 / Error processing message:', error);
-      responseText = '处理消息失败，请发送文本消息 / Failed to process message, please send text message';
-    }
-
-    try {
-      if (chat_type === 'p2p') {
-        /**
-         * 使用SDK调用发送消息接口。 Use SDK to call send message interface.
-         * https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
-         */
-        await client.im.v1.message.create({
-          params: {
-            receive_id_type: 'chat_id', // 消息接收者的 ID 类型，设置为会话ID。 ID type of the message receiver, set to chat ID.
-          },
-          data: {
-            receive_id: chat_id, // 消息接收者的 ID 为消息发送的会话ID。 ID of the message receiver is the chat ID of the message sending.
-            content: JSON.stringify({ text: responseText }),
-            msg_type: 'text', // 设置消息类型为文本消息。 Set message type to text message.
-          },
-        });
-      } else {
-        /**
-         * 使用SDK调用回复消息接口。 Use SDK to call reply message interface.
-         * https://open.feishu.cn/document/server-docs/im-v1/message/reply
-         */
-        await client.im.v1.message.reply({
-          path: {
-            message_id: message_id, // 要回复的消息 ID。 Message ID to reply.
-          },
-          data: {
-            content: JSON.stringify({ text: responseText }),
-            msg_type: 'text', // 设置消息类型为文本消息。 Set message type to text message.
-          },
-        });
-      }
-    } catch (error) {
-      console.error('发送消息失败 / Failed to send message:', error);
+    } catch (err) {
+      console.error('Error handling event:', err);
     }
   },
 });
 
-/**
- * 启动长连接，并注册事件处理器。
- * Start long connection and register event handler.
- */
-wsClient.start({ eventDispatcher });
+wsClient.start({ eventDispatcher }).catch((err) => {
+  console.error('Failed to start WebSocket client:', err);
+});
 
-console.log('任务创建机器人已启动 / Task creation bot started...');
-```
+console.log('🚀 Lark Task Creation Bot started');
+console.log(`📍 Domain: ${baseConfig.domain}`);
+console.log('⏳ Waiting for messages...');

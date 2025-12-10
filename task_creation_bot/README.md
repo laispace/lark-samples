@@ -1,8 +1,8 @@
 # 任务创建机器人 / Task Creation Bot
 
-一个功能完整的飞书任务创建机器人，支持多种编程语言实现。
+一个功能完整的飞书任务创建机器人，Node.js 实现版本。
 
-A fully-featured Lark task creation bot with implementations in multiple programming languages.
+A fully-featured Lark task creation bot implemented in Node.js.
 
 ## 概览 / Overview
 
@@ -42,8 +42,6 @@ This project demonstrates how to build a Lark bot that can:
 | 语言 / Language | 文档 / Documentation | 启动命令 / Start Command |
 |---|---|---|
 | **Node.js** | [nodejs-setup.md](nodejs/nodejs-setup.md) | `APP_ID=xxx APP_SECRET=xxx ./nodejs/bootstrap.sh` |
-| **Python** | [python-setup.md](python/python-setup.md) | `APP_ID=xxx APP_SECRET=xxx ./python/bootstrap.sh` |
-| **Go** | [go-setup.md](go/go-setup.md) | `APP_ID=xxx APP_SECRET=xxx ./go/bootstrap.sh` |
 
 ## 快速开始 / Quick Start
 
@@ -55,21 +53,8 @@ This project demonstrates how to build a Lark bot that can:
 
 ### 使用示例 / Usage Example
 
-#### Node.js
 ```bash
 cd nodejs
-APP_ID=your_app_id APP_SECRET=your_app_secret ./bootstrap.sh
-```
-
-#### Python
-```bash
-cd python
-APP_ID=your_app_id APP_SECRET=your_app_secret ./bootstrap.sh
-```
-
-#### Go
-```bash
-cd go
 APP_ID=your_app_id APP_SECRET=your_app_secret ./bootstrap.sh
 ```
 
@@ -176,18 +161,6 @@ task_creation_bot/
 │   ├── bootstrap.bat
 │   ├── README.md
 │   └── nodejs-setup.md
-├── python/              # Python 实现
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── bootstrap.sh
-│   ├── bootstrap.bat
-│   └── python-setup.md
-├── go/                  # Go 实现
-│   ├── main.go
-│   ├── go.mod
-│   ├── bootstrap.sh
-│   ├── bootstrap.bat
-│   └── go-setup.md
 └── README.md            # 本文档
 ```
 
@@ -283,8 +256,6 @@ for (const taskLine of tasks) {
 
 - [飞书开发者文档](https://open.feishu.cn/document/)
 - [飞书 Open API SDK - Node.js](https://github.com/larksuite/node-sdk)
-- [飞书 Open API SDK - Python](https://github.com/larksuite/python-sdk)
-- [飞书 Open API SDK - Go](https://github.com/larksuite/oapi-sdk-go)
 - [任务 API 文档](https://open.feishu.cn/document/server-docs/task-v2/task/create)
 - [消息 API 文档](https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create)
 
