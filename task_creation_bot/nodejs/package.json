@@ -1,0 +1,14 @@
+{
+  "name": "task_creation_bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "larksuite",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "node index.js"
+  },
+  "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.40.0"
+  }
+}
